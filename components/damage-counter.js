@@ -14,9 +14,10 @@ import {
   TouchableOpacity,
   View,
   Modal,
-  TextInput
+  FlatList
 } from "react-native";
-
+import { TextInput, Button, Checkbox } from "react-native-paper";
+import ListItem from "./list-item";
 export function cacheFonts(fonts) {
   return fonts.map(font => Font.loadAsync(font));
 }
@@ -26,13 +27,34 @@ export default class DamageCounter extends React.Component {
     modalVisible: false,
     hasLoaded: false,
     damage: 0,
+    modalDamage: "0",
     life: 0,
-    type: ""
+    modalLife: "0",
+    applyWeakness: false,
+    isBranchPokemon: false,
+    branchList: []
   };
 
-  damageRegister = () => {
-    this.setState({ damage: this.state.damage + 10 });
+  modalDamageOpen = () => {
     this.setState({ modalVisible: true });
+  };
+
+  setPokemonLife = life => {
+    this.setState({ modalLife: life });
+  };
+
+  setDamage = damage => {
+    this.setState({ modalDamage: damage });
+  };
+
+  applyModalValues = () => {
+    this.setState({ modalVisible: !this.state.modalVisible });
+    if (!this.state.isBranchPokemon) {
+      this.setActivePokemon();
+    } else {
+      this.setBranchPokemon();
+    }
+    this.clearModalConfiguration();
   };
 
   healPokemon = () => {
@@ -42,8 +64,39 @@ export default class DamageCounter extends React.Component {
   clearActivePokemonStatus = () => {
     this.setState({ damage: 0 });
     this.setState({ life: 0 });
-    this.setState({ type: "" });
   };
+
+  setBranchPokemon() {
+    const list = this.state.branchList;
+    const life = Number(this.state.modalLife);
+    let damage = 0;
+    if (this.state.applyWeakness) {
+      damage = Number(this.state.modalDamage) * 2;
+    } else {
+      damage = Number(this.state.modalDamage);
+    }
+    list.push({ life, damage });
+    this.setState({ branchList: list });
+  }
+
+  clearModalConfiguration() {
+    this.setState({ modalDamage: "0" });
+    this.setState({ applyWeakness: false });
+    this.setState({ isBranchPokemon: false });
+  }
+
+  setActivePokemon() {
+    this.setState({ life: this.state.modalLife });
+    if (this.state.applyWeakness) {
+      this.setState({
+        damage: this.state.damage + Number(this.state.modalDamage) * 2
+      });
+    } else {
+      this.setState({
+        damage: this.state.damage + Number(this.state.modalDamage)
+      });
+    }
+  }
 
   async _cacheResourcesAsync() {
     const fontAssets = cacheFonts([
@@ -90,27 +143,63 @@ export default class DamageCounter extends React.Component {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <StatusBar hidden={true} />
-        <View style={[styles.align, { alignItems: "center" }]}>
-          <Text
-            style={{
-              fontFamily: "poppins-bold",
-              fontSize: 25
-            }}
-          >
-            Pokemon Ativo
-          </Text>
-          <TouchableOpacity onPress={this.clearActivePokemonStatus}>
-            <MaterialIcons name="clear-all" size={25} />
-          </TouchableOpacity>
+
+        <View style={{ flex: 5 }}>
+          {this.state.damage ? (
+            <View style={[styles.align, { alignItems: "center" }]}>
+              <Text
+                style={{
+                  fontFamily: "poppins-bold",
+                  fontSize: 25
+                }}
+              >
+                Pokemon Ativo
+              </Text>
+              <TouchableOpacity onPress={this.clearActivePokemonStatus}>
+                <MaterialIcons name="clear-all" size={25} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <ListItem
+            top={this.state.damage ? 40 : 0}
+            damage={this.state.damage}
+            life={this.state.life}
+          />
+
+          {this.state.branchList.length ? (
+            <View
+              style={[styles.align, { alignItems: "center", marginTop: 20 }]}
+            >
+              <Text
+                style={{
+                  fontFamily: "poppins-light",
+                  fontSize: 20
+                }}
+              >
+                Pokemon do Banco
+              </Text>
+              <TouchableOpacity
+                onPress={() => this.setState({ branchList: [] })}
+              >
+                <MaterialIcons name="clear-all" size={25} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <FlatList
+            style={{ width: "100%", flex: 1 }}
+            data={this.state.branchList}
+            keyExtractor={(item, index) => item.life}
+            renderItem={({ item }) => (
+              <ListItem
+                damage={item.damage}
+                life={item.life}
+                top={item.damage ? 20 : 0}
+              />
+            )}
+          />
         </View>
-        <View style={[styles.align, { flex: 5 }]}>
-          <Text style={{ fontFamily: "poppins-light" }}>
-            {this.state.damage ? `Dano: ${this.state.damage}` : null}
-          </Text>
-          <Text style={{ fontFamily: "poppins-light" }}>
-            {this.state.damage ? `Vida Restante: ${this.state.life}` : null}
-          </Text>
-        </View>
+
+        {/* Buttons */}
         <View
           style={{
             flex: 1,
@@ -120,7 +209,7 @@ export default class DamageCounter extends React.Component {
             margin: 20
           }}
         >
-          <TouchableOpacity onPress={this.damageRegister}>
+          <TouchableOpacity onPress={this.modalDamageOpen}>
             <AntDesign
               name="pluscircle"
               size={40}
@@ -137,30 +226,87 @@ export default class DamageCounter extends React.Component {
             </TouchableOpacity>
           ) : null}
         </View>
+        {/* ! Buttons  */}
 
         <Modal
           animationType="slide"
           transparent={false}
           visible={this.state.modalVisible}
+          onRequestClose={() => {}}
         >
           <View style={{ margin: 22 }}>
             <View>
-              <Text style={{ fontFamily: "poppins-light" }}>
-                Vida do Pokemon ativo
-              </Text>
-              <TextInput
-                style={{ height: 40 }}
-                placeholder="Vida"
-                onChangeText={life => this.setState({ life })}
-              />
-
-              <TouchableOpacity
-                onPress={() => {
-                  this.setState({ modalVisible: !this.state.modalVisible });
+              <Text
+                style={{
+                  fontFamily: "poppins-bold",
+                  fontSize: 25
                 }}
               >
-                <Text>Hide Modal</Text>
-              </TouchableOpacity>
+                Preencha os campos abaixo:
+              </Text>
+              <TextInput
+                style={{ marginTop: 20 }}
+                label="Vida do pokemon ativo"
+                mode="outlined"
+                value={this.state.modalLife}
+                onChangeText={life => this.setPokemonLife(life)}
+              />
+              <TextInput
+                style={{ marginVertical: 20 }}
+                label="Dano causado ao pokemon"
+                mode="outlined"
+                value={this.state.modalDamage}
+                onChangeText={damage => this.setDamage(damage)}
+              />
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  alignContent: "center",
+                  alignItems: "center"
+                }}
+              >
+                <Checkbox
+                  status={this.state.applyWeakness ? "checked" : "unchecked"}
+                  onPress={() => {
+                    this.setState({ applyWeakness: !this.state.applyWeakness });
+                  }}
+                />
+                <Text style={{ fontFamily: "poppins-light", marginLeft: 10 }}>
+                  Aplicar fraqueza
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  marginVertical: 20,
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  alignContent: "center",
+                  alignItems: "center"
+                }}
+              >
+                <Checkbox
+                  status={this.state.isBranchPokemon ? "checked" : "unchecked"}
+                  onPress={() => {
+                    this.setState({
+                      isBranchPokemon: !this.state.isBranchPokemon
+                    });
+                  }}
+                />
+                <Text style={{ fontFamily: "poppins-light", marginLeft: 10 }}>
+                  Aplicar a pokemon no banco
+                </Text>
+              </View>
+
+              <Button
+                style={{ marginTop: 20 }}
+                mode="contained"
+                onPress={this.applyModalValues}
+              >
+                Registrar Dano
+              </Button>
             </View>
           </View>
         </Modal>
